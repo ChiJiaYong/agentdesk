@@ -38,15 +38,19 @@ def extract_order_ids(user_texts: list[str]) -> set[str]:
 
 
 def validate_tool_args(tool_name: str, args: dict, known_order_ids: set[str]) -> tuple[bool, str]:
-    """Return (ok, reason). Rejects invented ids with an actionable message."""
+    """Return (ok, reason). Rejects invented ids with an actionable message.
+
+    known_order_ids currently = ids the user typed. When tools start *returning*
+    order ids (e.g. a lookup tool), accumulate them here too — the state field
+    is the single source of truth for "ids the agent is allowed to act on".
+    """
     for arg in SOURCE_VALIDATED_ARGS.get(tool_name, []):
         if arg not in args:
             continue
         value = str(args[arg])
         if arg.endswith("order_id") and value not in known_order_ids:
             return _REJECT, (
-                f"rejected: {arg}={value!r} was not provided by the user and is not the "
-                f"output of a previous tool call. Ask the user for the order id instead "
-                f"of guessing."
+                f"rejected: {arg}={value!r} was not provided by the user. "
+                f"Ask the customer for the order id instead of guessing."
             )
     return _OK, ""
