@@ -163,8 +163,9 @@ class BGEEmbedder:
 
         self.model = SentenceTransformer(model_name, device=device)
         # ST 5.x renamed the getter; fall back for older installs
-        getter = getattr(self.model, "get_embedding_dimension", None) or getattr(
-            self.model, "get_sentence_embedding_dimension"
+        getter = (
+            getattr(self.model, "get_embedding_dimension", None)
+            or self.model.get_sentence_embedding_dimension
         )
         self.dim = getter()
 
