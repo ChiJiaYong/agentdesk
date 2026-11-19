@@ -22,9 +22,11 @@
 - [x] 本地验证全绿：ruff check/format + pytest 5/5 + smoke 5/5 + 双 demo
 - [x] git init + 9 个规范 commit（身份：ChiJiaYong，noreply 邮箱，repo 级配置；uv.lock 已入库）
 - [x] pre-commit 钩子已验证可安装（见已知问题：Windows hook 环境取不到 venv 可执行文件，暂卸载，以 CI 为 lint 门禁）
-- [ ] GitHub repo 创建 + push + main 分支保护（用户操作，指引见会话记录 2026-11-19）
-- [ ] Kaggle token 配置（用户操作）
-- [ ] W1 收尾：v0.1.0 tag + Release（push 后）
+- [x] GitHub repo 已创建并推送：github.com/ChiJiaYong/agentdesk（public）
+- [x] **CI 首跑全绿**（push event：lint/test/eval-smoke 全部 success）
+- [x] v0.1.0 tag 已推送
+- [x] main 分支保护（ruleset：PR 必经 + 状态检查门禁，见下）
+- [ ] Kaggle token 配置（唯一剩余手动项：kaggle.com→Settings→API→Create New Token→放 ~/.kaggle/kaggle.json）
 
 ## 已知问题 / 未决
 
@@ -52,3 +54,12 @@
   3. Kaggle：kaggle.com→Account→Create New API Token→kaggle.json 放 ~/.kaggle/
      （或把 KAGGLE_USERNAME/KAGGLE_KEY 填进 .env）
   4. 下次会话冷启动：读根计划 §0 checklist → 本文件 → `git log --oneline`
+
+### 2026-11-19 会话 2（W1 收尾）✅
+- 完成：仓库上线 + CI 首跑全绿 + v0.1.0 tag + main 分支保护
+- 踩坑记录（面试素材）：
+  1. GH007 邮箱隐私保护→改用 noreply 邮箱并 filter-branch 重写全部历史（未推送过，重写安全）
+  2. HTTP 直连 GitHub 间歇性 Connection reset→重试策略生效
+  3. GCM 在非交互会话挂起→从凭据库直读 gho_ 令牌配合 http.extraheader 推送（令牌不落日志）
+- 下一步：W2 —— 数据管道三脚本（Olist 入 SQLite 业务库、Amazon QA/GitLab handbook 入知识库）
+  + 混合检索（BM25+稠密+rerank）+ Agent B 最小闭环 + 首份检索评测报告
