@@ -45,9 +45,9 @@
   GenericFakeChatModel 无 bind_tools→NotImplementedError→子类覆写；
   evals 读 trace 里的 tool_calls 要用 wire 格式 `tc["function"]["name"]`
 - 遗留（用户操作）：
-  1. GitHub 建 public 仓库 `agentdesk`（不要勾选任何初始化文件），
-     然后：`git remote add origin https://github.com/<用户名>/agentdesk.git`
-     `git push -u origin main`
+  1. **push**（历史已重写为 noreply 身份，私人邮箱已清除；本地 HTTP 直连被重置，改在用户终端执行）：
+     `git push -u origin main`（仓库已配好 remote origin → ChiJiaYong/agentdesk）
+     若反复被重置：开代理后重试，或改用 SSH over 443（见 docs/dev-commands.md）
   2. push 后 Settings→Branches→Add rule：main 设 Require a pull request + status checks
   3. Kaggle：kaggle.com→Account→Create New API Token→kaggle.json 放 ~/.kaggle/
      （或把 KAGGLE_USERNAME/KAGGLE_KEY 填进 .env）
