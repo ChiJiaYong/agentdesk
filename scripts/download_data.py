@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -58,21 +59,56 @@ def resolve_url(candidates: list[str]) -> str | None:
     return None
 
 
-def download(url: str, dest: Path) -> Path:
+def download(url: str, dest: Path, max_retries: int = 12) -> Path:
+    """Resumable download with Range requests + retry loop.
+
+    Networks that mid-transfer-reset large responses (observed with GFW-adjacent
+    routes) would otherwise waste the whole transfer; HTTP Range lets us resume
+    from the last received byte. Server must support Range (UCSD datasets do);
+    if a server ignores Range and restarts from 0, we detect it via 200 vs 206
+    and restart the file accordingly.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with httpx.stream("GET", url, follow_redirects=True, timeout=120) as r:
-        r.raise_for_status()
-        with dest.open("wb") as f:
-            for chunk in r.iter_bytes():
-                f.write(chunk)
-    return dest
+    for attempt in range(1, max_retries + 1):
+        offset = dest.stat().st_size if dest.exists() else 0
+        headers = {"Range": f"bytes={offset}-"} if offset else {}
+        try:
+            with httpx.stream("GET", url, follow_redirects=True, timeout=60, headers=headers) as r:
+                if r.status_code == 206:  # partial content — append from offset
+                    mode = "ab"
+                    total = offset + int(r.headers.get("content-length", 0))
+                elif r.status_code == 200:  # full restart (Range ignored)
+                    mode = "wb"
+                    offset = 0
+                    total = int(r.headers.get("content-length", 0))
+                else:
+                    r.raise_for_status()
+                    continue
+                done = offset
+                with dest.open(mode) as f:
+                    for chunk in r.iter_bytes(1 << 16):
+                        f.write(chunk)
+                        done += len(chunk)
+                if total and done < total:
+                    raise httpx.RemoteProtocolError(f"incomplete: {done}/{total}")
+            print(f"[done] {dest.name} ({dest.stat().st_size} bytes, {attempt} attempt(s))")
+            return dest
+        except (httpx.HTTPError, httpx.RemoteProtocolError) as exc:
+            have = dest.stat().st_size if dest.exists() else 0
+            print(f"[retry {attempt}/{max_retries}] {type(exc).__name__}: have {have} bytes")
+            time.sleep(min(2 * attempt, 10))
+    raise RuntimeError(f"download failed after {max_retries} attempts: {url}")
 
 
 def fetch_amazon_qa(check_only: bool, manifest: dict) -> None:
     dest = DATA_RAW / "amazon_qa" / "qa_electronics.json.gz"
-    if dest.exists():
-        print(f"[skip] amazon_qa already present: {dest.name}")
+    if dest.exists() and gzip_intact(dest):
+        print(f"[skip] amazon_qa already complete: {dest.name} ({dest.stat().st_size} bytes)")
         return
+    if dest.exists():
+        print(
+            f"[warn] amazon_qa partial/interrupted file found ({dest.stat().st_size} bytes) — resuming"
+        )
     url = resolve_url(AMAZON_QA_CANDIDATES)
     if url is None:
         print("[error] Amazon QA endpoint unreachable (tried all candidates)")
@@ -80,8 +116,11 @@ def fetch_amazon_qa(check_only: bool, manifest: dict) -> None:
     print(f"[ok]   amazon_qa URL reachable: {url}")
     if check_only:
         return
-    print("[dl]   downloading amazon_qa (Electronics, ~100+ MB) ...")
-    download(url, dest)
+    download(url, dest)  # resumable: completes from existing partial bytes
+    if not gzip_intact(dest):
+        print("[error] downloaded file failed gzip integrity check — removing")
+        dest.unlink()
+        sys.exit(2)
     manifest["amazon_qa"] = {
         "source": url,
         "license": "public academic dataset (cite Wan & McAuley ICDM 2016; McAuley & Yang WWW 2016)",
@@ -90,6 +129,19 @@ def fetch_amazon_qa(check_only: bool, manifest: dict) -> None:
         "sha256": sha256_of(dest),
     }
     print(f"[done] amazon_qa -> {dest}")
+
+
+def gzip_intact(path: Path) -> bool:
+    """True iff the file is a structurally complete gzip member (reads to EOF)."""
+    import gzip as _gzip
+
+    try:
+        with _gzip.open(path, "rb") as f:
+            while f.read(1 << 20):
+                pass
+        return True
+    except (OSError, EOFError):
+        return False
 
 
 def fetch_olist(check_only: bool, manifest: dict) -> None:
