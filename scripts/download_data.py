@@ -96,9 +96,11 @@ def fetch_olist(check_only: bool, manifest: dict) -> None:
     # Auth: kaggle CLI >=2.x natively reads KAGGLE_API_TOKEN (KGAT_ tokens) from
     # the environment; classic kaggle.json / KAGGLE_USERNAME+KAGGLE_KEY also work.
     # We only check *presence* here — the token value never enters logs.
-    has_token = bool(os.getenv("KAGGLE_API_TOKEN")) or (
-        Path.home() / ".kaggle" / "kaggle.json"
-    ).exists() or (os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"))
+    has_token = (
+        bool(os.getenv("KAGGLE_API_TOKEN"))
+        or (Path.home() / ".kaggle" / "kaggle.json").exists()
+        or (os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"))
+    )
     if not has_token:
         print(
             "[warn] Kaggle auth not configured — skipping Olist.\n"
