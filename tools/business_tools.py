@@ -60,7 +60,9 @@ class BusinessToolbox:
             raise FileNotFoundError(
                 f"business DB missing at {db_path} — run scripts/build_business_db.py first"
             )
-        self.conn = sqlite3.connect(str(db_path))
+        # check_same_thread=False: FastAPI sync endpoints run on a threadpool
+        # (single-process demo scale; per-request connections are the async-W5 step).
+        self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute(_TICKETS_DDL)
         self.conn.commit()

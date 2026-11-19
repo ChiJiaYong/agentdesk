@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>AgentDesk · 客服工作台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0f1420; --panel:#171e2e; --line:#2a3550; --ink:#e8ecf6; --dim:#93a0bd;
+          --acc:#5b8cff; --ok:#3fbf7f; --warn:#f0a24b; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:14px/1.6 "Segoe UI",system-ui,sans-serif; }
+  .wrap { display:grid; grid-template-columns: 1fr 380px; gap:16px; max-width:1100px; margin:24px auto; padding:0 16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  h1 { font-size:16px; margin-bottom:10px; } .tier { color:var(--dim); font-size:12px; }
+  #chat { height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+  .msg { padding:8px 12px; border-radius:10px; max-width:85%; white-space:pre-wrap; }
+  .user { align-self:flex-end; background:#2a3a5e; }
+  .ai { align-self:flex-start; background:#222b40; }
+  .meta { font-size:11px; color:var(--dim); align-self:flex-start; }
+  .row { display:flex; gap:8px; }
+  input, textarea { flex:1; background:#0d1220; border:1px solid var(--line); color:var(--ink);
+                    border-radius:8px; padding:10px; font:inherit; }
+  button { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:10px 18px; cursor:pointer; }
+  button.ghost { background:#223055; }
+  .ticket { border:1px solid var(--line); border-radius:10px; padding:10px; margin:8px 0; font-size:13px; }
+  .ticket .oid { color:var(--dim); word-break:break-all; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:6px; font-size:11px;
+           background:#2c3e66; color:var(--acc); }
+  .flag { color:var(--warn); font-size:12px; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>💬 客户对话 <span class="tier" id="tier"></span></h1>
+    <div id="chat"></div>
+    <div class="row">
+      <input id="msg" placeholder="输入消息，例如：Where is my order e481f51cbdc54678b7cc49136f2d6af7?" />
+      <button onclick="send()">发送</button>
+    </div>
+    <p class="tier" style="margin-top:8px">演示订单号：<code>e481f51cbdc54678b7cc49136f2d6af7</code>（真实 Olist 订单）。
+    试试 <code>I want a refund, item broken</code> 触发人审流程。</p>
+  </div>
+  <div class="panel">
+    <h1>🧑‍💼 人工审核队列（HITL）</h1>
+    <div id="queue">加载中…</div>
+    <p class="tier" style="margin-top:10px">写操作（创建售后工单）不自动执行——Agent 产出草稿，由人工确认。
+    每轮对话的完整轨迹见 <code>/runs/</code>。</p>
+  </div>
+</div>
+<script>
+const S = { session: "web-" + Math.random().toString(36).slice(2, 8) };
+const chat = document.getElementById("chat");
+function add(cls, text, meta) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls; d.textContent = text;
+  chat.appendChild(d);
+  if (meta) { const m = document.createElement("div"); m.className = "meta"; m.textContent = meta; chat.appendChild(m); }
+  chat.scrollTop = chat.scrollHeight;
+}
+async function send() {
+  const input = document.getElementById("msg");
+  const text = input.value.trim(); if (!text) return;
+  input.value = ""; add("user", text);
+  const r = await fetch("/chat", { method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ session_id: S.session, customer_key: "web-" + S.session, message: text }) });
+  if (!r.ok) { add("ai", "服务错误 " + r.status); return; }
+  const data = await r.json();
+  add("ai", data.reply);
+  add("meta", `run ${data.run_id} · 模型层: ${data.model_tier}` +
+      (data.pii_redacted ? " · 已脱敏 PII" : "") +
+      (data.needs_human ? " · ⚠ 已进入人工审核" : ""));
+  loadQueue();
+}
+async function loadQueue() {
+  const r = await fetch("/workbench/queue");
+  const items = await r.json();
+  const q = document.getElementById("queue");
+  q.innerHTML = items.length ? "" : "<p class='tier'>队列为空 —— 在左侧发起退款/破损类请求试试。</p>";
+  for (const t of items) {
+    const d = document.createElement("div");
+    d.className = "ticket";
+    d.innerHTML = `<span class="badge">#${t.ticket_id}</span> <span class="oid">${t.order_id}</span>
+      <div>${t.issue}</div><div class="tier">${t.created_at} · status=${t.status}</div>
+      <button class="ghost" onclick="decide(${t.ticket_id},'approve')">批准</button>
+      <button class="ghost" onclick="decide(${t.ticket_id},'reject')">驳回</button>`;
+    q.appendChild(d);
+  }
+}
+async function decide(id, action) {
+  await fetch(`/workbench/${id}/decide`, { method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ action }) });
+  loadQueue();
+}
+fetch("/health").then(r => r.json()).then(d => {
+  document.getElementById("tier").textContent =
+    `· 模型层 ${d.model_tier}` + (d.model_tier === "demo" ? "（规则演示，零成本）" : "");
+});
+loadQueue();
+</script>
+</body>
+</html>
