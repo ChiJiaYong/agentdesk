@@ -11,27 +11,41 @@
 
 ## W1 清单
 
-- [x] 工程骨架：pyproject(uv)/.gitignore/.env.example/pre-commit/CI(3 jobs)/issue+PR 模板
+- [x] 工程骨架：pyproject(uv)/.gitignore/.env.example/pre-commit/CI(3 jobs)/issue+PR 模板/.gitattributes
 - [x] core/mini_loop.py — 手写 ReAct 循环（书 §2.2.4）+ FakeChatClient 离线注入
-- [x] examples/langgraph_quickstart.py — 同任务 LangGraph 对照版（离线可跑）
-- [x] tests/ — 循环行为 4 测 + LangGraph 1 测（全离线）
-- [x] evals/smoke.py — 5 条 canned 任务冒烟（CI 无 key 可跑，失败退出码 1）
+- [x] core/fake_chat.py — ScriptedToolChatModel（bind_tools 接缝，供 create_agent 离线跑）
+- [x] examples/ — 两个 demo（手写循环 / langchain 1.x create_agent）均离线跑通
+- [x] tests/ — 5 测全绿（循环行为 4 + create_agent 1）
+- [x] evals/smoke.py — 5/5 通过（CI 无 key 可跑，失败退出码 1）
 - [x] scripts/download_data.py — Amazon QA(UCSD 直链)+Olist(Kaggle CLI)+manifest 溯源
-- [x] docs/adr/0001 编排选型、0002 模型路由、0003 数据不入库
-- [ ] uv sync + 本地全绿验证（待本机跑）
-- [ ] git init + 首批 commit（等 git 身份配置）
-- [ ] GitHub repo 创建 + push + main 分支保护（用户操作）
+- [x] Amazon QA URL HEAD 探测通过：qa_Electronics.json.gz（大写 E）
+- [x] 本地验证全绿：ruff check/format + pytest 5/5 + smoke 5/5 + 双 demo
+- [x] git init + 8 个规范 commit（身份：wucaixizi <wucaixizi@gmail.com>，repo 级配置）
+- [x] pre-commit 钩子已安装
+- [ ] GitHub repo 创建 + push + main 分支保护（用户操作，指引见会话记录 2026-11-19）
 - [ ] Kaggle token 配置（用户操作）
-- [ ] Amazon QA URL HEAD 探测通过（脚本 --check）
+- [ ] W1 收尾：v0.1.0 tag + Release（push 后）
 
 ## 已知问题 / 未决
 
-- UCSD qa 文件名大小写不确定（qa_electronics vs qa_Electronics），脚本已做双候选 HEAD 探测
-- Windows 无 make：构建命令以 `uv run` 为准（README 已写），不引入 Makefile
+- 依赖版本注意：langchain 1.5.2 + langgraph 1.x，`create_react_agent` 已迁移为 `langchain.agents.create_agent`（项目已用新 API）
+- pyproject 用 `[tool.uv] package = false`（应用仓库非库），导入依赖根目录 conftest.py 与 `python -m` 调用方式
+- LICENSE 版权行当前为 "AgentDesk Contributors"，push 前可改为真实姓名（可选）
 
 ## 会话日志
 
-### 2026-11-19 会话 1（骨架日）
-- 完成：上表前 7 项全部文件就绪
-- 决策：见 docs/adr/0001~0003；构建命令走 uv run（Windows 无 make）
-- 遗留：上表后 4 项依赖用户账号操作
+### 2026-11-19 会话 1（骨架日）✅ 已收工
+- 完成：W1 除账号操作外全部完成；本地验证全绿；8 commits；pre-commit 就绪
+- 决策：应用仓库用 `[tool.uv] package=false`；LangChain 1.5.2 `create_agent` 新 API；
+  `bind_tools` 接缝用 ScriptedToolChatModel 离线覆盖
+- 踩坑记录：uv_build 要求 src 布局→改 package=false；
+  GenericFakeChatModel 无 bind_tools→NotImplementedError→子类覆写；
+  evals 读 trace 里的 tool_calls 要用 wire 格式 `tc["function"]["name"]`
+- 遗留（用户操作）：
+  1. GitHub 建 public 仓库 `agentdesk`（不要勾选任何初始化文件），
+     然后：`git remote add origin https://github.com/<用户名>/agentdesk.git`
+     `git push -u origin main`
+  2. push 后 Settings→Branches→Add rule：main 设 Require a pull request + status checks
+  3. Kaggle：kaggle.com→Account→Create New API Token→kaggle.json 放 ~/.kaggle/
+     （或把 KAGGLE_USERNAME/KAGGLE_KEY 填进 .env）
+  4. 下次会话冷启动：读根计划 §0 checklist → 本文件 → `git log --oneline`
