@@ -163,7 +163,13 @@ def build_support_agent(model: Any, retriever: Any, toolbox: BusinessToolbox):
 
     def validate(state: SupportState) -> dict:
         """Guardrail node: filter tool calls; rejections become ToolMessages the
-        model sees on its next plan() turn (it can then ask the user)."""
+        model sees on its next plan() turn (it can then ask the user).
+
+        When filtering occurred, the replacement AIMessage REUSES the original
+        message id so `add_messages` swaps it in place — emitting a fresh
+        message would duplicate the surviving tool calls in the trace (caught
+        by evals/agent_eval.py: the two-tool sequence executed each tool twice).
+        """
         last = state["messages"][-1]
         allowed: list[dict] = []
         rejected: list[ToolMessage] = []
@@ -175,9 +181,11 @@ def build_support_agent(model: Any, retriever: Any, toolbox: BusinessToolbox):
                 allowed.append(call)
             else:
                 rejected.append(ToolMessage(content=reason, tool_call_id=call["id"]))
+        if not rejected:
+            return {}  # nothing rejected — original message already carries all calls
         out: list[AnyMessage] = []
         if allowed:
-            out.append(AIMessage(content=last.content or "", tool_calls=allowed))
+            out.append(AIMessage(content=last.content or "", tool_calls=allowed, id=last.id))
         out.extend(rejected)
         return {"messages": out}
 
