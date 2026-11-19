@@ -22,8 +22,10 @@ project's "real data, verifiable claims" guarantee.
 ## Setup
 
 ```bash
-# 1. Kaggle token (for Olist): put kaggle.json in ~/.kaggle/ or set
-#    KAGGLE_USERNAME / KAGGLE_KEY in .env
+# 1. Kaggle auth (for Olist), any ONE of:
+#    - KAGGLE_API_TOKEN=<KGAT_...> in .env   (new token format; kaggle CLI >= 2.x)
+#    - kaggle.json in ~/.kaggle/             (classic)
+#    - KAGGLE_USERNAME / KAGGLE_KEY in .env  (classic)
 # 2. Fetch everything:
 uv run python scripts/download_data.py
 ```
