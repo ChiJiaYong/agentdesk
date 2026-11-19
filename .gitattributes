@@ -1,0 +1,13 @@
+# Normalize line endings: LF in repo and working tree for text files.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.gif binary
+*.gz binary
+*.pdf binary
