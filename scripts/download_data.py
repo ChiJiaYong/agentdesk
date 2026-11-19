@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_RAW = ROOT / "data" / "raw"
@@ -92,17 +93,18 @@ def fetch_amazon_qa(check_only: bool, manifest: dict) -> None:
 
 
 def fetch_olist(check_only: bool, manifest: dict) -> None:
-    has_token = (Path.home() / ".kaggle" / "kaggle.json").exists() or (
-        os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")
-    )
+    # Auth: kaggle CLI >=2.x natively reads KAGGLE_API_TOKEN (KGAT_ tokens) from
+    # the environment; classic kaggle.json / KAGGLE_USERNAME+KAGGLE_KEY also work.
+    # We only check *presence* here — the token value never enters logs.
+    has_token = bool(os.getenv("KAGGLE_API_TOKEN")) or (
+        Path.home() / ".kaggle" / "kaggle.json"
+    ).exists() or (os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"))
     if not has_token:
         print(
-            "[warn] Kaggle token not configured — skipping Olist.\n"
-            "       Register at kaggle.com -> Account -> Create New API Token,\n"
-            "       then place kaggle.json in ~/.kaggle/ (or set KAGGLE_USERNAME/KAGGLE_KEY in .env)."
+            "[warn] Kaggle auth not configured — skipping Olist.\n"
+            "       Options: KAGGLE_API_TOKEN in .env (KGAT_ token, CLI>=2.x),\n"
+            "       or kaggle.json in ~/.kaggle/, or KAGGLE_USERNAME/KAGGLE_KEY in .env."
         )
-        if check_only:
-            return
         return
     dest_dir = DATA_RAW / "olist"
     if dest_dir.exists() and any(dest_dir.glob("*.csv")):
@@ -141,6 +143,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="verify reachability only")
     args = parser.parse_args()
 
+    load_dotenv(ROOT / ".env")  # KAGGLE_API_TOKEN etc.; .env is gitignored
     manifest: dict = {}
     if MANIFEST.exists():
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
