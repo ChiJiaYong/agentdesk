@@ -5,13 +5,19 @@
 
 ## 当前状态
 
-- **Milestone**: W3 — 客服 Agent 图 + 工具治理（进行中，第一批已过全量测试）
-- **已完成**: tools/business_tools.py（三态结果/幂等键/UNIQUE 约束防重复副作用）、
-  core/guardrails.py（参数来源校验：订单号必须来自用户文本，Olist 32 位 hex 格式）、
-  agents/support/graph.py（load_user_ids → retrieve_kb → plan ⇄ validate ⇄ execute → review_gate；
-  护栏是图节点而非提示词；写操作升级 needs_human）；23 测试全绿（含图级 3 场景：
-  正常流/伪造 id 拒绝后恢复/写操作人审）
-- **下一步**: evals/agent_eval.py（脚本化 LLM 扩评测集）→ rerank 消融 → W4 工作台 + 记忆 + 脱敏 + Trace
+- **Milestone**: W4 — 平台层（trace/脱敏/记忆/服务/工作台）完成，W3 评测层完成
+- **已完成（W3+W4）**:
+  - evals/agent_eval.py：10 任务 × 6 风险类图级评测（轨迹断言，零 API 成本）；**抓到并修复
+    validate 节点双重执行 bug**（AIMessage 未复用 id → add_messages 追加；幂等键兜底 + 原位替换修复）
+  - core/trace.py：run 级 JSON 轨迹（节点更新/时延/token），runs/YYYY-MM-DD/ 落盘
+  - core/redaction.py：PII 正则脱敏（电话/邮箱 → 占位符，本地映射，仅工作台还原）；轨迹只存脱敏文本
+  - core/memory.py：会话层 + 客户事实层（冲突=supersede 保留历史；相同值 no-op 保 KV cache 前缀稳定）
+  - service/main.py + web/index.html：/chat、/workbench 队列与审批、/trace 访问、单页工作台
+  - service/demo_model.py：确定性规则演示模型（无 API key 端到端演示；有 key 自动升级 deepseek）
+- **踩坑**: SQLite 跨线程（FastAPI 线程池）→ check_same_thread=False；Demo 模型无状态导致工具调用
+  死循环 → 依据 ToolMessage 收尾；评测曾污染共享业务库 → 评测一律用临时副本
+- **下一步**: W5 = DEEPSEEK_API_KEY（用户待办）后真实模型评测（LLM-as-Judge 异源、Pass^k、成本对比）
+  + rerank 消融（大文件下载找窗口）；W6 = Docker + README 终稿 + 个人网站 + 演示视频
 
 ## W2 清单
 

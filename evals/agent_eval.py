@@ -178,7 +178,13 @@ def main() -> int:
     real_order = conn.execute("SELECT order_id FROM orders LIMIT 1").fetchone()[0]
     conn.close()
 
-    toolbox = BusinessToolbox(DB)
+    # Evals must never mutate the shared artifact: copy to a temp DB for writes.
+    import shutil
+    import tempfile
+
+    tmp_db = Path(tempfile.mkdtemp()) / "business_eval.db"
+    shutil.copy(DB, tmp_db)
+    toolbox = BusinessToolbox(tmp_db)
     retriever = HybridRetriever(FakeHashEmbedder())
     retriever.add(
         [
