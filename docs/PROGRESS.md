@@ -5,9 +5,13 @@
 
 ## 当前状态
 
-- **Milestone**: W2 — 数据管道 + 混合检索 + 评测（进行中）
-- **已完成**: 检索消融评测 v0.1（hybrid hit@5=0.926 > 单路 0.852，报告 docs/eval-reports/retrieval-v0.1.md）
-- **下一步**: PR 合并 W2 批次 → W3 客服 Agent 图 + 工具 + rerank 消融
+- **Milestone**: W3 — 客服 Agent 图 + 工具治理（进行中，第一批已过全量测试）
+- **已完成**: tools/business_tools.py（三态结果/幂等键/UNIQUE 约束防重复副作用）、
+  core/guardrails.py（参数来源校验：订单号必须来自用户文本，Olist 32 位 hex 格式）、
+  agents/support/graph.py（load_user_ids → retrieve_kb → plan ⇄ validate ⇄ execute → review_gate；
+  护栏是图节点而非提示词；写操作升级 needs_human）；23 测试全绿（含图级 3 场景：
+  正常流/伪造 id 拒绝后恢复/写操作人审）
+- **下一步**: evals/agent_eval.py（脚本化 LLM 扩评测集）→ rerank 消融 → W4 工作台 + 记忆 + 脱敏 + Trace
 
 ## W2 清单
 
