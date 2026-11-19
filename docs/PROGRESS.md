@@ -20,8 +20,8 @@
 - [x] scripts/download_data.py — Amazon QA(UCSD 直链)+Olist(Kaggle CLI)+manifest 溯源
 - [x] Amazon QA URL HEAD 探测通过：qa_Electronics.json.gz（大写 E）
 - [x] 本地验证全绿：ruff check/format + pytest 5/5 + smoke 5/5 + 双 demo
-- [x] git init + 8 个规范 commit（身份：wucaixizi <wucaixizi@gmail.com>，repo 级配置）
-- [x] pre-commit 钩子已安装
+- [x] git init + 9 个规范 commit（身份：wucaixizi <wucaixizi@gmail.com>，repo 级配置；uv.lock 已入库）
+- [x] pre-commit 钩子已验证可安装（见已知问题：Windows hook 环境取不到 venv 可执行文件，暂卸载，以 CI 为 lint 门禁）
 - [ ] GitHub repo 创建 + push + main 分支保护（用户操作，指引见会话记录 2026-11-19）
 - [ ] Kaggle token 配置（用户操作）
 - [ ] W1 收尾：v0.1.0 tag + Release（push 后）
@@ -30,6 +30,8 @@
 
 - 依赖版本注意：langchain 1.5.2 + langgraph 1.x，`create_react_agent` 已迁移为 `langchain.agents.create_agent`（项目已用新 API）
 - pyproject 用 `[tool.uv] package = false`（应用仓库非库），导入依赖根目录 conftest.py 与 `python -m` 调用方式
+- pre-commit：Windows 下 `uv run pre-commit install` 写出的 hook 在 git 触发时找不到 venv 内的 pre-commit 可执行文件；
+  处置：暂不启用本地钩子，ruff 门禁由 CI 承担；push 后若需本地钩子，改用全局安装 pre-commit 的方案
 - LICENSE 版权行当前为 "AgentDesk Contributors"，push 前可改为真实姓名（可选）
 
 ## 会话日志
