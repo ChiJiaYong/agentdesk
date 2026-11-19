@@ -1,0 +1,26 @@
+services:
+  agentdesk:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+    volumes:
+      - ./data:/app/data          # datasets + built artifacts (persist across restarts)
+      - ./runs:/app/runs          # per-run traces (bad-case evidence chain)
+      - ./logs:/app/logs
+      - hf-cache:/root/.cache/huggingface
+    # First boot: fetch the real public datasets, then build the business DB
+    # and the knowledge-base chunks (idempotent — skips what already exists).
+    command: >
+      sh -c "python scripts/download_data.py;
+             python scripts/fetch_regulations.py;
+             python -m scripts.build_business_db;
+             python -m scripts.build_knowledge_base --qa-sample 3000;
+             uvicorn service.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  hf-cache:
