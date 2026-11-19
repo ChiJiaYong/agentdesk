@@ -20,7 +20,7 @@
 - [x] scripts/download_data.py — Amazon QA(UCSD 直链)+Olist(Kaggle CLI)+manifest 溯源
 - [x] Amazon QA URL HEAD 探测通过：qa_Electronics.json.gz（大写 E）
 - [x] 本地验证全绿：ruff check/format + pytest 5/5 + smoke 5/5 + 双 demo
-- [x] git init + 9 个规范 commit（身份：wucaixizi <wucaixizi@gmail.com>，repo 级配置；uv.lock 已入库）
+- [x] git init + 9 个规范 commit（身份：ChiJiaYong，noreply 邮箱，repo 级配置；uv.lock 已入库）
 - [x] pre-commit 钩子已验证可安装（见已知问题：Windows hook 环境取不到 venv 可执行文件，暂卸载，以 CI 为 lint 门禁）
 - [ ] GitHub repo 创建 + push + main 分支保护（用户操作，指引见会话记录 2026-11-19）
 - [ ] Kaggle token 配置（用户操作）
@@ -38,6 +38,7 @@
 
 ### 2026-11-19 会话 1（骨架日）✅ 已收工
 - 完成：W1 除账号操作外全部完成；本地验证全绿；8 commits；pre-commit 就绪
+- 注：公开提交统一使用 GitHub noreply 邮箱（272977235+ChiJiaYong@users.noreply.github.com），私人邮箱不入历史
 - 决策：应用仓库用 `[tool.uv] package=false`；LangChain 1.5.2 `create_agent` 新 API；
   `bind_tools` 接缝用 ScriptedToolChatModel 离线覆盖
 - 踩坑记录：uv_build 要求 src 布局→改 package=false；
