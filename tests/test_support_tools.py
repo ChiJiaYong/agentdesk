@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
 from core.guardrails import extract_order_ids, validate_tool_args
 from tools.business_tools import BusinessToolbox
+
+# data/ is gitignored (ADR-0003): CI clones have no business DB. These tests
+# require the locally-built artifact and are skipped gracefully on fresh clones.
+DB_READY = Path("data/processed/business.db").exists()
+requires_db = pytest.mark.skipif(
+    not DB_READY, reason="business DB not built (run scripts/build_business_db.py)"
+)
 
 
 @pytest.fixture(scope="module")
@@ -39,6 +47,7 @@ def toolbox(tmp_path_factory):
 # -- three-state tools -------------------------------------------------------
 
 
+@requires_db
 def test_get_order_status_ok(toolbox: BusinessToolbox, real_order_id: str) -> None:
     result = toolbox.get_order_status(real_order_id)
     assert result.status == "ok"
@@ -54,12 +63,14 @@ def test_get_order_status_ok(toolbox: BusinessToolbox, real_order_id: str) -> No
     }
 
 
+@requires_db
 def test_get_order_status_not_found_is_error_not_unknown(toolbox: BusinessToolbox) -> None:
     result = toolbox.get_order_status("f" * 32)  # well-formed but absent id
     assert result.status == "error"
     assert result.error_code == "NOT_FOUND"
 
 
+@requires_db
 def test_get_order_amount_sums_payments(toolbox: BusinessToolbox, real_order_id: str) -> None:
     result = toolbox.get_order_amount(real_order_id)
     assert result.status in {"ok", "error"}  # subset may lack payments for this order
@@ -71,6 +82,7 @@ def test_get_order_amount_sums_payments(toolbox: BusinessToolbox, real_order_id:
 # -- idempotency --------------------------------------------------------------
 
 
+@requires_db
 def test_create_ticket_idempotent_replay(toolbox: BusinessToolbox, real_order_id: str) -> None:
     key = "test-key-001"
     first = toolbox.create_ticket(real_order_id, "broken screen", key)
@@ -81,6 +93,7 @@ def test_create_ticket_idempotent_replay(toolbox: BusinessToolbox, real_order_id
     assert second.data["ticket_id"] == first.data["ticket_id"]  # no duplicate row
 
 
+@requires_db
 def test_create_ticket_requires_idempotency_key(
     toolbox: BusinessToolbox, real_order_id: str
 ) -> None:

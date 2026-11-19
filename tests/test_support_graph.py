@@ -9,6 +9,7 @@ Three scenarios map 1:1 to the eval risk categories:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 from langchain_core.messages import AIMessage
@@ -18,6 +19,12 @@ from core.retrieval import Chunk, FakeHashEmbedder, HybridRetriever
 from tools.business_tools import BusinessToolbox
 
 REAL_ID = "e481f51cbdc54678b7cc49136f2d6af7"  # real Olist order id (W2 DB)
+
+# data/ is gitignored (ADR-0003): these scenarios run where the DB is built.
+pytestmark = pytest.mark.skipif(
+    not Path("data/processed/business.db").exists(),
+    reason="business DB not built (run scripts/build_business_db.py)",
+)
 
 
 @pytest.fixture(scope="module")
