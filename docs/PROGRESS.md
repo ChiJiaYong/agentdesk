@@ -5,11 +5,23 @@
 
 ## 当前状态
 
-- **Milestone**: W1 — 仓库初始化 + 理解练习
-- **进行中**: GitHub 远程仓库待创建（需要账号操作）
-- **下一步**: 创建 GitHub repo 并 push → 配置 main 分支保护 → Kaggle token
+- **Milestone**: W2 — 数据管道 + 混合检索 + 评测（进行中）
+- **已完成**: 检索消融评测 v0.1（hybrid hit@5=0.926 > 单路 0.852，报告 docs/eval-reports/retrieval-v0.1.md）
+- **下一步**: PR 合并 W2 批次 → W3 客服 Agent 图 + 工具 + rerank 消融
 
-## W1 清单
+## W2 清单
+
+- [x] 数据管道：Amazon QA 34.5MB（断点续传 4 段续完）+ Olist 九表 42.6MB + 法规三件套官网抓取 + manifest 溯源
+- [x] scripts/build_business_db.py → SQLite 99,441 真实订单（状态分布齐全）+ 质量报告
+- [x] scripts/build_knowledge_base.py → 3,052 chunks（法规 53 + 真实问答 2,999）
+- [x] core/retrieval.py：CJK 分块（重叠）/ jieba BM25 / BGEEmbedder（query prefix）/ RRF 混合 / save-load
+- [x] evals/retrieval_eval.py：金标动态定位（条款正则 + 真实问句），零 LLM 成本消融
+- [x] 评测报告 v0.1：hybrid hit@5=0.926 / MRR=0.744（+7.4pp vs 单路）
+- [x] 依赖：rank-bm25/jieba/numpy 主依赖；sentence-transformers 进 ml 可选组（CI 轻装）；清华镜像装 torch 2.15
+- [ ] FastAPI docs / GitLab handbook 语料接入（网络窗口，不阻塞主线）
+- [ ] rerank 消融（bge-reranker-base，W3）
+
+## W1 清单（已完成，存档）
 
 - [x] 工程骨架：pyproject(uv)/.gitignore/.env.example/pre-commit/CI(3 jobs)/issue+PR 模板/.gitattributes
 - [x] core/mini_loop.py — 手写 ReAct 循环（书 §2.2.4）+ FakeChatClient 离线注入
