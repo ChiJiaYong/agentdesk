@@ -27,6 +27,7 @@ from typing_extensions import TypedDict
 from core.context_compression import compress_messages
 from core.guardrails import extract_order_ids, validate_tool_args
 from core.status_bar import build_status_bar, fingerprint
+from core.tool_call_repair import repair_tool_calls, set_valid_tools
 from tools.business_tools import BusinessToolbox
 
 # --------------------------------------------------------------------------- #
@@ -198,6 +199,7 @@ class SupportState(TypedDict):
 
 def build_support_agent(model: Any, retriever: Any, toolbox: BusinessToolbox):
     """Compile the support-agent graph. `model` must support bind_tools()."""
+    set_valid_tools([s["function"]["name"] for s in TOOL_SCHEMAS])
 
     def load_user_ids(state: SupportState) -> dict:
         user_texts = [m.content for m in state["messages"] if getattr(m, "type", "") == "human"]
@@ -219,6 +221,9 @@ def build_support_agent(model: Any, retriever: Any, toolbox: BusinessToolbox):
         )
         context = [SystemMessage(content=SYSTEM_PROMPT), *trajectory, HumanMessage(content=status)]
         response = model.bind_tools(TOOL_SCHEMAS).invoke(context)
+        # [5.1.4] Harness 修复：模型把工具调用输出为 JSON 文本时（llama-server
+        # --jinja + Qwen2.5 实测故障），提升为原生 tool_call（轨迹标 repaired）
+        response = repair_tool_calls(response)
         return {"messages": [response]}
 
     def validate(state: SupportState) -> dict:
