@@ -1,13 +1,19 @@
-"""FastAPI service: chat endpoint + HITL workbench + trace access.
+r"""FastAPI service: chat endpoint + HITL workbench + trace access + model tiers.
 
 Pipeline per /chat turn (each stage is a W4 deliverable):
 
     redact(PII out) → memory.append → memory facts → traced_invoke(graph)
     → memory.learn_from_turn → restore(PII back, display only) → reply
 
-Model tier auto-detection: DEEPSEEK_API_KEY present → real provider (W5);
-otherwise the deterministic DemoSupportModel (zero-key demo, labeled as such
-in the UI). Graph/tools/guardrails/traces are identical across tiers.
+Model tiers (service/model_tiers.py) — user-facing choices:
+    demo  : zero-config rule-based model (labeled as demo in the UI)
+    local : llama-server loading a local GGUF (e.g. D:\AI\models\llm\*.gguf),
+            OpenAI-compatible, data never leaves the machine
+    api   : user pastes an API key in the Settings window (memory only, never
+            persisted); any OpenAI-compatible endpoint
+
+Tier resolution: explicit UI choice (validated) > auto-probe (api key →
+local health → demo). Graph/tools/guardrails/traces are identical across tiers.
 """
 
 from __future__ import annotations
@@ -16,7 +22,6 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -28,7 +33,7 @@ from core.memory import MemoryService
 from core.redaction import redact, restore
 from core.retrieval import BGEEmbedder, Chunk, FakeHashEmbedder, HybridRetriever
 from core.trace import traced_invoke
-from service.demo_model import DemoSupportModel
+from service import model_tiers
 from tools.business_tools import BusinessToolbox
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,19 +59,21 @@ def _build_retriever() -> HybridRetriever:
     return retriever
 
 
-def _build_model() -> tuple[Any, str]:
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    if api_key:
-        from langchain_openai import ChatOpenAI  # optional W5 tier
-
-        model = ChatOpenAI(
-            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            api_key=api_key,
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            temperature=0.2,
-        )
-        return model, "deepseek"
-    return DemoSupportModel(), "demo"
+def _apply_tier(
+    choice: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    model_name: str | None = None,
+) -> dict:
+    tier = model_tiers.resolve_tier(choice)
+    model, info = model_tiers.build_model(
+        tier, api_key=api_key, base_url=base_url, model_name=model_name
+    )
+    _state["model"] = model
+    _state["model_tier"] = tier
+    _state["model_detail"] = info["detail"]
+    _state["agent"] = build_support_agent(_state["model"], _state["retriever"], _state["toolbox"])
+    return info
 
 
 @asynccontextmanager
@@ -74,14 +81,14 @@ async def lifespan(_app: FastAPI):
     _state["retriever"] = _build_retriever()
     _state["toolbox"] = BusinessToolbox()
     _state["memory"] = MemoryService()
-    _state["model"], _state["model_tier"] = _build_model()
-    _state["agent"] = build_support_agent(_state["model"], _state["retriever"], _state["toolbox"])
+    _state["tier_choice"] = "auto"
+    _apply_tier("auto")
     yield
     _state["toolbox"].close()
     _state["memory"].close()
 
 
-app = FastAPI(title="AgentDesk", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="AgentDesk", version="0.5.0", lifespan=lifespan)
 
 
 class ChatRequest(BaseModel):
@@ -90,9 +97,53 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class TierSettings(BaseModel):
+    tier: str = "auto"  # auto | demo | local | api
+    api_key: str | None = None
+    base_url: str | None = None
+    model_name: str | None = None
+
+
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "model_tier": _state.get("model_tier", "booting")}
+    return {
+        "ok": True,
+        "model_tier": _state.get("model_tier", "booting"),
+        "model_detail": _state.get("model_detail", ""),
+    }
+
+
+@app.get("/settings")
+def get_settings() -> dict:
+    return {
+        "tier_choice": _state.get("tier_choice", "auto"),
+        "active_tier": _state.get("model_tier"),
+        "model_detail": _state.get("model_detail"),
+        "availability": {
+            "api": model_tiers.api_key_available(),
+            "local": model_tiers.local_server_healthy(),
+            "demo": True,
+        },
+        "local_server_url": model_tiers.DEFAULT_LOCAL_BASE_URL,
+    }
+
+
+@app.post("/settings")
+def update_settings(settings: TierSettings) -> dict:
+    """使用者交互窗口：选层。api key 仅存内存（不落盘）。"""
+    if settings.api_key:
+        os.environ["DEEPSEEK_API_KEY"] = settings.api_key  # runtime only
+    _state["tier_choice"] = settings.tier
+    try:
+        info = _apply_tier(
+            settings.tier,
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+            model_name=settings.model_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"active_tier": _state["model_tier"], "detail": info["detail"]}
 
 
 @app.post("/chat")

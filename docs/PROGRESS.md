@@ -5,19 +5,22 @@
 
 ## 当前状态
 
-- **Milestone**: W4 — 平台层（trace/脱敏/记忆/服务/工作台）完成，W3 评测层完成
-- **已完成（W3+W4）**:
-  - evals/agent_eval.py：10 任务 × 6 风险类图级评测（轨迹断言，零 API 成本）；**抓到并修复
-    validate 节点双重执行 bug**（AIMessage 未复用 id → add_messages 追加；幂等键兜底 + 原位替换修复）
-  - core/trace.py：run 级 JSON 轨迹（节点更新/时延/token），runs/YYYY-MM-DD/ 落盘
-  - core/redaction.py：PII 正则脱敏（电话/邮箱 → 占位符，本地映射，仅工作台还原）；轨迹只存脱敏文本
-  - core/memory.py：会话层 + 客户事实层（冲突=supersede 保留历史；相同值 no-op 保 KV cache 前缀稳定）
-  - service/main.py + web/index.html：/chat、/workbench 队列与审批、/trace 访问、单页工作台
-  - service/demo_model.py：确定性规则演示模型（无 API key 端到端演示；有 key 自动升级 deepseek）
-- **踩坑**: SQLite 跨线程（FastAPI 线程池）→ check_same_thread=False；Demo 模型无状态导致工具调用
-  死循环 → 依据 ToolMessage 收尾；评测曾污染共享业务库 → 评测一律用临时副本
-- **下一步**: W5 = DEEPSEEK_API_KEY（用户待办）后真实模型评测（LLM-as-Judge 异源、Pass^k、成本对比）
-  + rerank 消融（大文件下载找窗口）；W6 = Docker + README 终稿 + 个人网站 + 演示视频
+- **Milestone**: W5 — 全书精读对齐 + 模型三档层 + 真实模型评测（进行中）
+- **已完成（W3→W5）**:
+  - W3/W4 平台层：图+护栏+工具治理、trace、脱敏、记忆、FastAPI、工作台（详见 W2 清单下各节）
+  - **全书 313 页逐页精读**（7 连续区间）→ docs/BOOK_MAP.md 基线（60+ 处方带节号）
+  - 书对齐重构（PR#10）：智能体化RAG（search_knowledge 工具+来源标注 §3.3.4/2.4.7）、
+    上下文骨架（冻结前缀+末尾状态栏 §2.2.5/2.3/2.6）、分层压缩（§2.7.4）、指纹熔断（§5.1.5）、
+    工具描述艺术（§4.2.2）、流程驱动SOP（§2.4.1/2.4.3）；ADR-0006
+  - 模型三档层：demo（零配置）/ local（llama.cpp b12556 llama-server + 本机 GGUF
+    Qwen2.5-7B Q5_K_M，原生工具调用实测✓，--jinja）/ api（UI 窗口填 key，仅存内存）；
+    llama-server 部署至 D:\AI\tools\llama-cpp（断点续传下载 24.9MB）
+  - evals/real_model_eval.py：非脚本化真实模型评测 + Pass@k/Pass^k 双口径（§7.2.2）
+    + LLM-as-Judge（4准则+Veto §7.5.1，同源 caveat 已记录）
+- **踩坑**: llama-cpp-python 无 cp313 win 轮子（需 MSVC）→ 预编译 llama-server 方案；
+  ST 6.x 对 bge 仓 AutoProcessor 报错 → pin ST<5 + transformers 4.57；
+  状态栏消息挡住演示模型 ToolMessage 收尾判定 → 扫描跳过 <agent_status>
+- **下一步**: real_model_eval 结果入报告与网站 → rerank 消融（下载窗口）→ 演示视频 → tag v1.0
 
 ## W2 清单
 

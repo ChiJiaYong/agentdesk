@@ -136,14 +136,23 @@ def main() -> int:
         "modes": {},
     }
     for mode in args.modes.split(","):
-        needs_dense = mode in {"dense", "hybrid"}
+        needs_dense = mode in {"dense", "hybrid", "hybrid_rerank"}
         if needs_dense:
             try:
                 from core.retrieval import BGEEmbedder
             except ImportError:
                 print(f"[warn] sentence-transformers unavailable — skipping {mode}")
                 continue
-            retriever = HybridRetriever(BGEEmbedder())
+            reranker = None
+            if mode == "hybrid_rerank":
+                try:
+                    from core.retrieval import CrossEncoderReranker
+
+                    reranker = CrossEncoderReranker()
+                except Exception as exc:  # noqa: BLE001 — model may not be cached
+                    print(f"[warn] reranker unavailable ({type(exc).__name__}) — skipping {mode}")
+                    continue
+            retriever = HybridRetriever(BGEEmbedder(), reranker=reranker)
         else:
             retriever = HybridRetriever(None)  # sparse-only instance
         retriever.add(chunks)

@@ -52,6 +52,28 @@ One customer turn:
 `redact → memory → load_user_ids → retrieve_kb → plan ⇄ validate ⇄ execute → review_gate → reply`
 — every stage persists a step into `runs/YYYY-MM-DD/{run_id}.json`.
 
+## Model tiers — 使用者的两种主动选择 + 零配置演示层
+
+| 层 | 说明 | 配置 |
+|---|---|---|
+| `demo` | 规则驱动的确定性模型，零成本零配置，完整走通图/工具/护栏 | 无需任何配置 |
+| `local` | **本机模型**：llama-server 加载 GGUF（如 `D:\AI\models\llm\*.gguf`），OpenAI 兼容接口，数据不出本机 | 启动 llama-server（命令如下），或设 `LLAMA_SERVER_URL` |
+| `api` | **API Key**：在网页设置窗口自行粘贴（仅存服务端内存，不落盘），任意 OpenAI 兼容端点 | 设置窗口或 `.env` 的 `DEEPSEEK_API_KEY` |
+
+Start the local model tier (one command, uses your own GGUF):
+
+```bash
+D:\AI\tools\llama-cpp\llama-server.exe `
+  -m "D:\AI\models\llm\Qwen2.5-7B-Instruct-abliterated.Q5_K_M.gguf" `
+  --port 8100 --ctx-size 8192 --threads 12 --jinja --alias qwen2.5-7b-local
+```
+
+`--jinja` enables Qwen2.5's native tool-calling template (verified: the model
+emits correct `tool_calls` with real order ids). Switch tiers in the workbench
+UI via **⚙ 模型设置** — graph, tools, guardrails and traces are identical
+across tiers (book §1.2.3/§7.6: model swap is an evaluation variable, not a
+rewrite).
+
 ## Quick start
 
 ```bash
@@ -68,14 +90,15 @@ uv run uvicorn service.main:app --port 8000
 ```
 
 Configure `.env` from `.env.example`. **No API key needed** to run everything
-above — the deterministic demo tier exercises the full graph; set
-`DEEPSEEK_API_KEY` to upgrade the generation tier in place.
+above — the deterministic demo tier exercises the full graph; the settings
+window upgrades the tier in place.
 
 ```bash
 uv run pytest -m "not slow"        # 31 tests, fully offline
 uv run python -m evals.smoke       # CI eval gate (5 tasks, mock LLM)
 uv run python -m evals.agent_eval  # 10 graph-level tasks, 6 risk classes
 uv run python -m evals.retrieval_eval --modes bm25,dense,hybrid
+uv run python -m evals.real_model_eval --tier local --k 2   # Pass^k + judge (local tier)
 ```
 
 ## Engineering practices
