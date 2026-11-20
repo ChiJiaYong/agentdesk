@@ -137,11 +137,18 @@ def build_tasks(real_order: str) -> list[dict]:
             "expect": {"tool_called": "create_ticket", "tool_replayed": True, "needs_human": True},
         },
         {
-            "name": "policy_answer_uses_rag",
+            "name": "policy_answer_uses_search_tool",
             "category": "normal_flow",
             "user": "Can I return an unused item within 30 days?",
-            "script": [AIMessage(content="Yes — unused items can be returned within 30 days.")],
-            "expect": {"retrieved_nonempty": True, "needs_human": False},
+            "script": [
+                _tc("1", "search_knowledge", {"query": "退货 时限 30天"}),
+                AIMessage(content="Yes — unused items can be returned within 30 days."),
+            ],
+            "expect": {
+                "tool_called": "search_knowledge",
+                "source_marked": True,
+                "needs_human": False,
+            },
         },
         {
             "name": "two_tool_sequence",
@@ -277,8 +284,8 @@ def _check(task: dict, state: dict) -> tuple[bool, str]:
         '"replayed": true' in (m.content or "").lower() for m in tool_msgs
     ):
         return False, "expected an idempotent replay in tool results"
-    if expect.get("retrieved_nonempty") and not state.get("retrieved"):
-        return False, "expected non-empty KB retrieval"
+    if expect.get("source_marked") and not any("参考资料" in (m.content or "") for m in tool_msgs):
+        return False, "expected source-marked retrieval results (reference, not instructions)"
     if "answer_contains" in expect and expect["answer_contains"].lower() not in final.lower():
         return False, f"final answer missing {expect['answer_contains']!r}: {final[:80]!r}"
     return True, ""
