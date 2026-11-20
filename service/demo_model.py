@@ -38,12 +38,20 @@ class DemoSupportModel(GenericFakeChatModel):
         # Termination: after tool results come back, produce a final answer
         # instead of re-issuing the same call (loop guard — a stateless rules
         # model would otherwise spin until recursion_limit).
-        last = messages[-1] if messages else None
+        # NB: the graph appends an <agent_status> HumanMessage at the END of the
+        # input (book §2.6) — skip it when finding the real last turn message.
+        i = len(messages) - 1
+        while i >= 0 and str(getattr(messages[i], "content", "")).startswith("<agent_status>"):
+            i -= 1
+        last = messages[i] if i >= 0 else None
         if getattr(last, "type", "") == "tool":
             return self._summarize_tool_result(str(getattr(last, "content", "")))
 
         user_text = " ".join(
-            str(getattr(m, "content", "")) for m in messages if getattr(m, "type", "") == "human"
+            str(getattr(m, "content", ""))
+            for m in messages
+            if getattr(m, "type", "") == "human"
+            and not str(getattr(m, "content", "")).startswith("<agent_status>")
         )
         order_ids = ORDER_RX.findall(user_text)
         order_id = order_ids[-1] if order_ids else None
