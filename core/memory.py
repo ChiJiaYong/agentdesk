@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS session_messages (
     created_at TEXT NOT NULL,
     run_id TEXT
 );
-CREATE INDEX idx_session ON session_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_session ON session_messages(session_id);
 CREATE TABLE IF NOT EXISTS customer_facts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_key TEXT NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS customer_facts (
     created_at TEXT NOT NULL,
     superseded_at TEXT
 );
-CREATE INDEX idx_facts ON customer_facts(customer_key, fact_key);
+CREATE INDEX IF NOT EXISTS idx_facts ON customer_facts(customer_key, fact_key);
 """
 
 

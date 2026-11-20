@@ -159,6 +159,11 @@ class BGEEmbedder:
     QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
 
     def __init__(self, model_name: str = "BAAI/bge-small-zh-v1.5", device: str = "cpu") -> None:
+        import os
+
+        # CN-network default: route HF traffic through the mirror unless the
+        # caller set an explicit endpoint. Must be set BEFORE the ST import.
+        os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
         from sentence_transformers import SentenceTransformer  # lazy: heavy import
 
         self.model = SentenceTransformer(model_name, device=device)
@@ -193,15 +198,44 @@ def _rrf_fuse(rankings: list[dict[str, int]], k: int) -> dict[str, float]:
     return fused
 
 
+class CrossEncoderReranker:
+    """神经重排序（book §3.2.4 第三阶段）——与双塔是两种匹配范式，非 RRF 的补丁。
+
+    bge-reranker-base（~1.1GB，CPU 可跑）：对融合后 top-N 逐对精排。
+    懒加载：未安装 sentence-transformers 或模型缺失时由调用方降级。
+    """
+
+    def __init__(self, model_name: str = "BAAI/bge-reranker-base") -> None:
+        import os
+
+        os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+        from sentence_transformers import CrossEncoder  # lazy: heavy import
+
+        self.model = CrossEncoder(model_name)
+
+    def rerank(self, query: str, chunks: list[Chunk], top_k: int) -> list[tuple[Chunk, float]]:
+        pairs = [(query, c.text) for c in chunks]
+        scores = self.model.predict(pairs)
+        order = sorted(range(len(chunks)), key=lambda i: scores[i], reverse=True)[:top_k]
+        return [(chunks[i], float(scores[i])) for i in order]
+
+
 class HybridRetriever:
     """BM25 + dense in one queryable object; per-mode ranks kept for debugging."""
 
     DENSE_CANDIDATES = 50  # per-mode candidate depth before RRF (§3.2.4)
 
-    def __init__(self, embedder: Embedder | None = None, rrf_k: int = 60) -> None:
+    def __init__(
+        self,
+        embedder: Embedder | None = None,
+        rrf_k: int = 60,
+        reranker: CrossEncoderReranker | None = None,
+    ) -> None:
         # embedder=None → sparse-only instance (bm25 mode); dense/hybrid need one.
+        # reranker=None → skip the cross-encoder stage (§3.2.4 阶段三)。
         self.embedder = embedder
         self.rrf_k = rrf_k
+        self.reranker = reranker
         self.chunks: list[Chunk] = []
         self._by_id: dict[str, Chunk] = {}
         self._bm25 = None
@@ -241,12 +275,18 @@ class HybridRetriever:
             fused = _rrf_fuse([b, d], self.rrf_k)
             ranks = {"bm25": b, "dense": d}
         top = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
-        return [
+        out = [
             Retrieved(
                 chunk=self._by_id[cid], score=score, ranks={m: r.get(cid) for m, r in ranks.items()}
             )
             for cid, score in top
         ]
+        # §3.2.4 阶段三：cross-encoder 对融合后候选精排（reranker 未配置则跳过）
+        if self.reranker is not None and mode in {"hybrid", "dense"} and out:
+            reranked = self.reranker.rerank(query, [r.chunk for r in out], top_k=k)
+            by_id = {r.chunk.id: r.ranks for r in out}
+            out = [Retrieved(chunk=c, score=s, ranks=by_id.get(c.id, {})) for c, s in reranked]
+        return out
 
     def _bm25_ranking(self, query: str) -> dict[str, int]:
         scores = self._bm25.get_scores(tokenize(query)) if self._bm25 else []
