@@ -32,6 +32,7 @@ from agents.support.graph import build_support_agent
 from core.memory import MemoryService
 from core.redaction import redact, restore
 from core.retrieval import BGEEmbedder, Chunk, FakeHashEmbedder, HybridRetriever
+from core.skills import SkillRegistry
 from core.trace import traced_invoke
 from service import model_tiers
 from tools.business_tools import BusinessToolbox
@@ -64,6 +65,7 @@ def _apply_tier(
     api_key: str | None = None,
     base_url: str | None = None,
     model_name: str | None = None,
+    skill_registry: SkillRegistry | None = None,
 ) -> dict:
     tier = model_tiers.resolve_tier(choice)
     model, info = model_tiers.build_model(
@@ -72,7 +74,12 @@ def _apply_tier(
     _state["model"] = model
     _state["model_tier"] = tier
     _state["model_detail"] = info["detail"]
-    _state["agent"] = build_support_agent(_state["model"], _state["retriever"], _state["toolbox"])
+    _state["agent"] = build_support_agent(
+        _state["model"],
+        _state["retriever"],
+        _state["toolbox"],
+        skill_registry=skill_registry if skill_registry is not None else _state.get("skills"),
+    )
     return info
 
 
@@ -81,8 +88,9 @@ async def lifespan(_app: FastAPI):
     _state["retriever"] = _build_retriever()
     _state["toolbox"] = BusinessToolbox()
     _state["memory"] = MemoryService()
+    _state["skills"] = SkillRegistry()
     _state["tier_choice"] = "auto"
-    _apply_tier("auto")
+    _apply_tier("auto", skill_registry=_state["skills"])
     yield
     _state["toolbox"].close()
     _state["memory"].close()

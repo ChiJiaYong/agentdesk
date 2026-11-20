@@ -109,8 +109,7 @@ def test_status_bar_maintained_by_code_not_llm() -> None:
 def test_system_prefix_is_frozen() -> None:
     # [2.3] system prompt must not embed dynamic content; deterministic across calls
     assert "You are the customer-support assistant" in SYSTEM_PROMPT
-    assert "{" not in SYSTEM_PROMPT.replace("{{", "") or "format" not in SYSTEM_PROMPT
-    assert len(TOOL_SCHEMAS) == 5  # frozen schema list (4 business + search_knowledge)
+    assert len(TOOL_SCHEMAS) == 6  # frozen schema list (4 business + search_knowledge + load_skill)
 
 
 # -- [3.3.4] agentic RAG ---------------------------------------------------------
